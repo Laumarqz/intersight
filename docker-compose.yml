@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: intersight_db
+    restart: always
+    environment:
+      POSTGRES_USER: intersight_user
+      POSTGRES_PASSWORD: intersight@pass@123
+      POSTGRES_DB: intersight_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

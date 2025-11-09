@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  # Este es el nombre de tu servicio de base de datos
+  db:
+    image: postgres:15-alpine  # Usamos una imagen ligera de Postgres
+    container_name: intersight_db
+    restart: always
+    
+    # Configuración de tu base de datos
+    environment:
+      POSTGRES_USER: intersight_user
+      POSTGRES_PASSWORD: @intersight_password@
+      POSTGRES_DB: intersight_db
+    
+    # Mapea el puerto de Postgres a tu máquina local
+    # Puedes conectarte desde tu app en 'localhost:5433'
+    ports:
+      - "5433:5432"
+    
+    # Guarda los datos para que no se borren si reinicias el contenedor
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+# Define el volumen persistente
+volumes:
+  postgres_data:
