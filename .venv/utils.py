@@ -1,22 +1,25 @@
-import fitz  # PyMuPDF
-import docx
 import io
-import re
-import requests
-import psycopg2
-import config
 import json
+import re
+from typing import Optional
+
+import docx
+import fitz
+import psycopg2
+import requests
 import google.generativeai as genai
 from bs4 import BeautifulSoup
 
-DB_NAME = "intersight_db"
-DB_USER = "intersight_user"
-DB_PASS = "intersight@pass@123"
-DB_HOST = "localhost"
-DB_PORT = "5433"
+import config
+
+DB_NAME = config.DB_NAME
+DB_USER = config.DB_USER
+DB_PASS = config.DB_PASS
+DB_HOST = config.DB_HOST
+DB_PORT = config.DB_PORT
 
 
-def get_db_connection():
+def get_db_connection() -> Optional[psycopg2.extensions.connection]:
     """Establishes a connection to the PostgreSQL database."""
     try:
         return psycopg2.connect(
@@ -34,7 +37,7 @@ def get_db_connection():
         return None
 
 
-def call_gemini_api(prompt_with_data):
+def call_gemini_api(prompt_with_data: str) -> str:
     """Sends a prompt to the Gemini API and returns the clean text response."""
     try:
         genai.configure(api_key=config.GOOGLE_API_KEY)
@@ -87,7 +90,7 @@ def read_document(uploaded_file):
         return f"Error: Could not read file. {e}"
 
 
-def find_links(cv_text):
+def find_links(cv_text: str):
     """Scans the CV text for relevant URLs and professional profile links."""
     url_pattern = re.compile(
         r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
@@ -110,7 +113,7 @@ def find_links(cv_text):
     return list(found_links)
 
 
-def get_github_context(github_url):
+def get_github_context(github_url: str):
     """Fetches public GitHub repository information for a given profile URL."""
     if not github_url:
         return "N/A"
@@ -150,7 +153,7 @@ def get_github_context(github_url):
         return "Error processing GitHub profile."
 
 
-def get_portfolio_context(portfolio_url):
+def get_portfolio_context(portfolio_url: str):
     """Scrapes text content from a portfolio website."""
     if not portfolio_url:
         return "N/A"

@@ -1,7 +1,12 @@
-import streamlit as st
-import os
+import copy
 import json
+import os
 import time
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+import streamlit as st
+
 import config
 
 try:
@@ -380,24 +385,330 @@ st.markdown("""
             opacity: 1;
         }
     }
+
+    .skill-badge {
+        display: inline-block;
+        padding: 6px 14px;
+        margin: 4px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.15);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .decision-chip {
+        padding: 12px 16px;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.06);
+        border-left: 4px solid currentColor;
+        margin-bottom: 10px;
+    }
+
+    .timeline-item {
+        padding: 12px 16px;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.05);
+        border-left: 3px solid rgba(255, 255, 255, 0.2);
+        margin-bottom: 8px;
+    }
+
+    .timeline-accepted { border-color: #2ed573; }
+    .timeline-rejected { border-color: #ff4757; }
+    .timeline-on_hold { border-color: #ffa502; }
 </style>
 """, unsafe_allow_html=True)
 
-# Session State
-if 'candidates' not in st.session_state:
-    st.session_state.candidates = []
-if 'current_index' not in st.session_state:
-    st.session_state.current_index = 0
-if 'on_hold_candidates' not in st.session_state:
-    st.session_state.on_hold_candidates = []
-if 'generated_feedback' not in st.session_state:
-    st.session_state.generated_feedback = {}
-if 'swipe_direction' not in st.session_state:
-    st.session_state.swipe_direction = None
+# Demo deck so HR teams can try the "Tinder-style" flow without uploading CVs
+DEMO_CANDIDATES: List[Dict[str, Any]] = [
+    {
+        "id": "demo_valeria",
+        "filename": "Valeria_Romero.pdf",
+        "analysis_360": {
+            "traffic_light": "green",
+            "overall_match_accuracy": 92,
+            "risk_pillar": {
+                "red_flags": [
+                    {
+                        "alert": "Disponibilidad",
+                        "detail": "Necesita dos semanas para iniciar el nuevo rol."
+                    }
+                ]
+            },
+            "potential_pillar": {
+                "green_flags": [
+                    {
+                        "hidden_gem": "Arquitecta de datos",
+                        "detail": "Diseñó pipelines MLOps con cero incidentes en 12 meses."
+                    },
+                    {
+                        "hidden_gem": "Mentora",
+                        "detail": "Lidera un programa de coaching para mujeres en tecnología."
+                    }
+                ],
+                "plus_skills": ["People management", "Observability", "FinOps"]
+            },
+            "evidence_pillar": {
+                "technical_fit": [
+                    {
+                        "skill": "Python",
+                        "fit_score_%": 95,
+                        "cv_evidence": "Construyó microservicios FastAPI orquestados en Kubernetes."
+                    },
+                    {
+                        "skill": "AWS",
+                        "fit_score_%": 93,
+                        "cv_evidence": "Implementó arquitecturas serverless con Lambda y Step Functions."
+                    },
+                    {
+                        "skill": "Data reliability",
+                        "fit_score_%": 90,
+                        "cv_evidence": "Implementó pruebas de calidad en Airflow + Great Expectations."
+                    }
+                ],
+                "cultural_fit": [
+                    {
+                        "value": "Ownership",
+                        "cv_evidence": "Propuso y ejecutó el roadmap de observabilidad cross-team."
+                    },
+                    {
+                        "value": "Colaboración",
+                        "cv_evidence": "Facilitó workshops con producto y compliance para priorizar entregables."
+                    }
+                ]
+            },
+            "analyst_summary": "Perfil senior con visión end-to-end. Excelente match técnico y cultural; solo requiere gestionar fecha de ingreso."
+        },
+        "full_context": {
+            "cv_text": "Valeria lidera squads de datos y automatizó reportes financieros a gran escala.",
+            "culture_text": "Aurora Bank prioriza ownership, transparencia y obsesión por el cliente.",
+            "job_title": "Senior Backend/Data Engineer",
+            "company_name": "Aurora Bank"
+        }
+    },
+    {
+        "id": "demo_mateo",
+        "filename": "Mateo_Suarez.pdf",
+        "analysis_360": {
+            "traffic_light": "yellow",
+            "overall_match_accuracy": 74,
+            "risk_pillar": {
+                "red_flags": [
+                    {
+                        "alert": "Tenencia corta",
+                        "detail": "Rotación anual en los últimos tres empleos."
+                    }
+                ]
+            },
+            "potential_pillar": {
+                "green_flags": [
+                    {
+                        "hidden_gem": "Storytelling comercial",
+                        "detail": "Ganó 4 deals enterprise aplicando talleres de descubrimiento."
+                    }
+                ],
+                "plus_skills": ["Medición de NPS", "Playbooks comerciales"]
+            },
+            "evidence_pillar": {
+                "technical_fit": [
+                    {
+                        "skill": "Ventas B2B",
+                        "fit_score_%": 78,
+                        "cv_evidence": "Creció pipeline 160% en SaaS de ciberseguridad."
+                    },
+                    {
+                        "skill": "Account Based Marketing",
+                        "fit_score_%": 70,
+                        "cv_evidence": "Co-creó campañas junto a marketing para cuentas objetivo."
+                    }
+                ],
+                "cultural_fit": [
+                    {
+                        "value": "Aprendizaje continuo",
+                        "cv_evidence": "Certificado reciente en negociación estratégica."
+                    }
+                ]
+            },
+            "analyst_summary": "Buen potencial de revenue, pero necesita plan de retención y claridad en motivadores para reducir rotación."
+        },
+        "full_context": {
+            "cv_text": "Mateo lidera equipos de ventas enterprise en Latinoamérica.",
+            "culture_text": "Nexora prioriza la curiosidad, la colaboración y la orientación a resultados.",
+            "job_title": "Account Executive LATAM",
+            "company_name": "Nexora"
+        }
+    },
+    {
+        "id": "demo_lucia",
+        "filename": "Lucia_Gomez.pdf",
+        "analysis_360": {
+            "traffic_light": "red",
+            "overall_match_accuracy": 48,
+            "risk_pillar": {
+                "red_flags": [
+                    {
+                        "alert": "Brecha técnica",
+                        "detail": "Experiencia centrada en soporte, no en desarrollo de productos."
+                    },
+                    {
+                        "alert": "Desalineación cultural",
+                        "detail": "Preferencia declarada por trabajo individual en entornos muy estructurados."
+                    }
+                ]
+            },
+            "potential_pillar": {
+                "green_flags": [
+                    {
+                        "hidden_gem": "Atención al detalle",
+                        "detail": "Lideró esfuerzos de QA manual que redujeron incidentes críticos 30%."
+                    }
+                ],
+                "plus_skills": ["Documentación", "Coordinación con soporte"]
+            },
+            "evidence_pillar": {
+                "technical_fit": [
+                    {
+                        "skill": "Testing manual",
+                        "fit_score_%": 60,
+                        "cv_evidence": "Diseñó planes de pruebas para sistemas bancarios."
+                    }
+                ],
+                "cultural_fit": []
+            },
+            "analyst_summary": "No cubre los requisitos de producto digital; conviene explorar posiciones de calidad o soporte especializado."
+        },
+        "full_context": {
+            "cv_text": "Lucía se desempeña como analista QA enfocada en validaciones manuales.",
+            "culture_text": "Pixel Labs privilegia la autonomía extrema y el prototipado rápido.",
+            "job_title": "Product Designer",
+            "company_name": "Pixel Labs"
+        }
+    }
+]
 
-UPLOAD_DIR = "./uploads"
+
+SESSION_DEFAULTS: Dict[str, Any] = {
+    "candidates": [],
+    "current_index": 0,
+    "on_hold_candidates": [],
+    "generated_feedback": {},
+    "swipe_direction": None,
+    "accepted_candidates": [],
+    "rejected_candidates": [],
+    "decision_history": []
+}
+
+
+def init_session_state() -> None:
+    for key, value in SESSION_DEFAULTS.items():
+        if key not in st.session_state:
+            st.session_state[key] = copy.deepcopy(value)
+
+
+def reset_workspace() -> None:
+    for key, value in SESSION_DEFAULTS.items():
+        st.session_state[key] = copy.deepcopy(value)
+
+
+def load_demo_candidates() -> None:
+    reset_workspace()
+    st.session_state.candidates = copy.deepcopy(DEMO_CANDIDATES)
+
+
+def record_decision(candidate: Dict[str, Any], decision: str, feedback: Optional[str] = None) -> None:
+    analysis = candidate.get("analysis_360", {})
+    entry = {
+        "id": candidate.get("id"),
+        "filename": candidate.get("filename"),
+        "match": analysis.get("overall_match_accuracy", 0),
+        "traffic_light": analysis.get("traffic_light", "grey"),
+        "decision": decision,
+        "feedback": feedback,
+        "timestamp": datetime.utcnow().strftime("%H:%M:%S")
+    }
+    st.session_state.decision_history.append(entry)
+    if decision == "accepted":
+        st.session_state.accepted_candidates.append(entry)
+    elif decision == "rejected":
+        st.session_state.rejected_candidates.append(entry)
+
+
+def render_pipeline_sidebar() -> None:
+    st.markdown("### 📈 Estado del mazo")
+    total = len(st.session_state.candidates)
+    revisados = min(st.session_state.current_index, total)
+    pendientes = max(total - revisados, 0)
+    st.metric("Pendientes", pendientes)
+    st.metric("Aceptados", len(st.session_state.accepted_candidates))
+    st.metric("Rechazados", len(st.session_state.rejected_candidates))
+    st.metric("En pausa", len(st.session_state.on_hold_candidates))
+
+
+def render_decision_board() -> None:
+    if not any([
+        st.session_state.accepted_candidates,
+        st.session_state.rejected_candidates,
+        st.session_state.on_hold_candidates
+    ]):
+        return
+
+    st.markdown("---")
+    st.markdown("## 🗂️ Tablero de decisiones")
+    col_a, col_b, col_c = st.columns(3)
+    columns = [
+        (col_a, "Aceptados", st.session_state.accepted_candidates, "#2ed573"),
+        (col_b, "Rechazados", st.session_state.rejected_candidates, "#ff4757"),
+        (col_c, "On Hold", [
+            {
+                "filename": c.get("filename"),
+                "match": c.get("analysis_360", {}).get("overall_match_accuracy", 0),
+                "decision": "on_hold"
+            }
+            for c in st.session_state.on_hold_candidates
+        ], "#ffa502")
+    ]
+
+    for column, label, items, color in columns:
+        with column:
+            st.markdown(f"#### {label}")
+            if not items:
+                st.caption("Sin candidatos")
+            else:
+                for item in items:
+                    st.markdown(
+                        f"<div class='decision-chip' style='color:{color};'>"
+                        f"<strong>{item.get('filename', 'CV')}</strong><br>"
+                        f"Match: {item.get('match', 0)}%"
+                        "</div>",
+                        unsafe_allow_html=True
+                    )
+
+
+def render_swipe_timeline(max_events: int = 5) -> None:
+    if not st.session_state.decision_history:
+        return
+
+    st.markdown("### 🕒 Historial de swipes")
+    for event in reversed(st.session_state.decision_history[-max_events:]):
+        label = {
+            "accepted": "Aceptado",
+            "rejected": "Rechazado",
+            "on_hold": "En pausa"
+        }.get(event["decision"], event["decision"]) or "--"
+        st.markdown(
+            f"<div class='timeline-item timeline-{event['decision']}'>"
+            f"<strong>{label}</strong> · {event['filename']} · {event['match']}% · {event['timestamp']}"
+            "</div>",
+            unsafe_allow_html=True
+        )
+
+
+init_session_state()
+
+UPLOAD_DIR = config.UPLOAD_DIR
 if not os.path.exists(UPLOAD_DIR):
-    os.makedirs(UPLOAD_DIR)
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # Sidebar
 with st.sidebar:
@@ -420,6 +731,13 @@ with st.sidebar:
 
     if blind_mode:
         st.info("👁️ Blind Mode: Active\n\nFocus on Risk, Potential & Evidence")
+
+    st.markdown("---")
+    render_pipeline_sidebar()
+
+    if st.button("🔄 Reiniciar mazo", use_container_width=True):
+        reset_workspace()
+        st.rerun()
 
     st.markdown("---")
     st.markdown("### 📊 The 3 Pillars")
@@ -445,6 +763,12 @@ with st.expander("📋 STEP 1: Configure Job & Upload CVs", expanded=True):
         placeholder="We value innovation, proactivity, and continuous learning..."
     )
 
+    st.caption("¿Solo quieres probar el flujo? Usa el mazo demo listo para deslizar.")
+    if st.button("🚀 Cargar mazo demo", use_container_width=True, key="load_demo"):
+        load_demo_candidates()
+        st.success("Mazo demo listo. Desliza para evaluar perfiles.")
+        st.rerun()
+
     uploaded_files = st.file_uploader(
         "📄 Upload CVs (PDF or DOCX)",
         type=["pdf", "docx"],
@@ -463,6 +787,10 @@ with st.expander("📋 STEP 1: Configure Job & Upload CVs", expanded=True):
                 st.session_state.current_index = 0
                 st.session_state.on_hold_candidates = []
                 st.session_state.generated_feedback = {}
+                st.session_state.accepted_candidates = []
+                st.session_state.rejected_candidates = []
+                st.session_state.decision_history = []
+                st.session_state.swipe_direction = None
 
                 progress_bar = st.progress(0, "🔄 Starting analysis...")
                 total_files = len(uploaded_files)
@@ -572,6 +900,12 @@ else:
     current_candidate = st.session_state.candidates[st.session_state.current_index]
     analysis = current_candidate["analysis_360"]
 
+    progress_value = st.session_state.current_index / len(st.session_state.candidates)
+    st.progress(progress_value)
+    st.caption(
+        f"{st.session_state.current_index} revisados · {len(st.session_state.candidates)} totales"
+    )
+
     color_map = {
         "green": "#2ed573",
         "yellow": "#ffa502",
@@ -637,6 +971,18 @@ else:
         else:
             st.caption("_No technical evidence found_")
 
+        if analysis.get('evidence_pillar', {}).get('cultural_fit'):
+            st.markdown("### 🤝 Cultural Fit")
+            for culture_value in analysis['evidence_pillar']['cultural_fit']:
+                st.markdown(f"**{culture_value['value']}**")
+                st.caption(culture_value['cv_evidence'])
+
+    plus_skills = analysis.get('potential_pillar', {}).get('plus_skills') or []
+    if plus_skills:
+        badges = "".join([f"<span class='skill-badge'>{skill}</span>" for skill in plus_skills])
+        st.markdown("### ✨ Plus Skills")
+        st.markdown(f"<div>{badges}</div>", unsafe_allow_html=True)
+
     if analysis.get('potential_pillar', {}).get('green_flags'):
         st.markdown("### 💎 Hidden Gems")
         for gem in analysis['potential_pillar']['green_flags']:
@@ -666,6 +1012,7 @@ else:
                 )
                 feedback_email = call_gemini_api(feedback_prompt)
                 st.session_state.generated_feedback[current_candidate['id']] = feedback_email
+            record_decision(current_candidate, "rejected", feedback_email)
             st.session_state.current_index += 1
             st.session_state.swipe_direction = None
             st.rerun()
@@ -674,6 +1021,7 @@ else:
         if st.button("⏸️ On Hold", use_container_width=True, key="hold"):
             st.session_state.swipe_direction = "up"
             time.sleep(0.5)
+            record_decision(current_candidate, "on_hold")
             st.session_state.on_hold_candidates.append(current_candidate)
             st.session_state.current_index += 1
             st.session_state.swipe_direction = None
@@ -683,9 +1031,13 @@ else:
         if st.button("✅ Accept", use_container_width=True, key="accept"):
             st.session_state.swipe_direction = "right"
             time.sleep(0.5)
+            record_decision(current_candidate, "accepted")
             st.session_state.current_index += 1
             st.session_state.swipe_direction = None
             st.rerun()
+
+render_decision_board()
+render_swipe_timeline()
 
 # STEP 3: On Hold Review
 if st.session_state.on_hold_candidates and st.session_state.current_index >= len(st.session_state.candidates):
@@ -710,10 +1062,12 @@ if st.session_state.on_hold_candidates and st.session_state.current_index >= len
             col_no, col_yes = st.columns(2)
             with col_no:
                 if st.button("❌ Final Reject", key=f"no_{i}", use_container_width=True):
+                    record_decision(candidate, "rejected")
                     st.session_state.on_hold_candidates.pop(i)
                     st.rerun()
             with col_yes:
                 if st.button("✅ Final Accept", key=f"yes_{i}", use_container_width=True):
+                    record_decision(candidate, "accepted")
                     st.session_state.on_hold_candidates.pop(i)
                     st.rerun()
 
