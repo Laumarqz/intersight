@@ -30,7 +30,10 @@ def get_db_connection():
         print("Error: psycopg2 library is required for database connection.")
         return None
     except Exception as e:
-        print(f"Error connecting to database: {e}")
+        # Use str() with errors='replace' to handle encoding issues gracefully
+        error_msg = str(e).encode('utf-8', errors='replace').decode('utf-8', errors='replace')
+        print(f"Database connection failed: {error_msg}")
+        print("Application will continue without database persistence.")
         return None
 
 

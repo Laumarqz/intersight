@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>frontend</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <div
+      id="global-error-log"
+      style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        background: rgba(0, 0, 0, 0.9);
+        color: red;
+        z-index: 9999;
+        padding: 20px;
+        display: none;
+      "
+    ></div>
+    <script>
+      window.onerror = function (msg, url, line, col, error) {
+        var log = document.getElementById("global-error-log");
+        log.style.display = "block";
+        log.innerHTML +=
+          "<div><strong>Error:</strong> " +
+          msg +
+          "<br/>" +
+          url +
+          ":" +
+          line +
+          ":" +
+          col +
+          "<br/>" +
+          (error ? error.stack : "") +
+          "</div><hr/>";
+      };
+      window.onunhandledrejection = function (event) {
+        var log = document.getElementById("global-error-log");
+        log.style.display = "block";
+        log.innerHTML +=
+          "<div><strong>Unhandled Rejection:</strong> " +
+          event.reason +
+          "</div><hr/>";
+      };
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
